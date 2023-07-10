@@ -48,3 +48,28 @@ const gameBoard = (() => {
   return {isEmpty, setNought, setCross, getValueAt, clearBoard};
 
 })();
+
+const playerFactory = (name, marker, type) => {
+  
+  if (!((typeof name === 'string') && name.length > 0)) throw new Error('name must be a non-empty string');
+  else if (!(marker === 'x' || marker === 'o')) throw new Error('Invalid marker (marker must be either x or o)');
+  else if (!(type === 'human' || type === 'aiEasy' || type === 'aiMedium' || type === 'aiImpossible')) {
+    throw new Error(`Invalid player type (player must be of type human, aiEasy, aiMedium, or aiImpossible)`);
+  }
+
+  function getName() {
+    return name;
+  }
+
+  function getMarker() {
+    return marker;
+  }
+
+  function getType() {
+    return type;
+  }
+
+  return {getName, getMarker, getType};
+  
+}
+
