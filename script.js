@@ -192,7 +192,7 @@ const displayController = (() => {
     return totalDiv;
   }
 
-  function displayGame(player1Name, player2Name) {
+  function displayGame(player1Name, player2Name, startingMarker) {
     clearDisplay();
     const mainContainer = getMainContainer();
 
@@ -206,6 +206,15 @@ const displayController = (() => {
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
         const gameBoardDOMElement = createElement('div', {'data-i': `${i}`, 'data-j': `${j}`, 'class': ['game-board-element']});
+        
+        if (startingMarker === "cross") gameBoardDOMElement.classList.add('display-cross-on-hover');
+        else gameBoardDOMElement.classList.add('display-nought-on-hover');
+
+        gameBoardDOMElement.classList.add('unsettled');
+        
+        // can call game.playRound()
+        gameBoardDOMElement.addEventListener('click', dummyFunction);
+
         gameBoardDOMContainer.append(gameBoardDOMElement);
       }
     }
@@ -217,6 +226,104 @@ const displayController = (() => {
 
   }
 
+  function gameGetGameBoardElementByIndices(i, j) {
+    const gameBoardDOMContainer = document.getElementById('game-board-container');
+    const gameBoardDOMElement = gameBoardDOMContainer.querySelector(`[data-i="${i}"][data-j="${j}"]`);
+    return gameBoardDOMElement;
+  }
+
+  function gameStyleWinningLine(winningPairs) {
+    for (pair of winningPairs) {
+      const gameBoardDOMElement = gameGetGameBoardElementByIndices(pair[0], pair[1]);
+      gameBoardDOMElement.classList.add("winning-line");
+    }
+  }
+
+  function gameRemoveHoverBackgrounds() {
+    const gameBoardDOMElements = document.querySelectorAll('.game-board-element');
+    for (let i = 0; i < gameBoardDOMElements.length; i++) {
+      const gameBoardDOMElement = gameBoardDOMElements.item(i);
+      gameBoardDOMElement.classList.remove('display-cross-on-hover');
+      gameBoardDOMElement.classList.remove('display-nought-on-hover');
+    }
+  }
+
+  function gameAddNoughtHoverBackgrounds() {
+    const gameBoardDOMElements = document.querySelectorAll('.game-board-element');
+    for (let i = 0; i < gameBoardDOMElements.length; i++) {
+      const gameBoardDOMElement = gameBoardDOMElements.item(i);
+      if (gameBoardDOMElement.classList.contains('unsettled')) {
+        gameBoardDOMElement.classList.remove('display-nought-on-hover');
+      }
+    }
+  }
+
+  function gameAddCrossHoverBackgrounds() {
+    const gameBoardDOMElements = document.querySelectorAll('.game-board-element');
+    for (let i = 0; i < gameBoardDOMElements.length; i++) {
+      const gameBoardDOMElement = gameBoardDOMElements.item(i);
+      if (gameBoardDOMElement.classList.contains('unsettled')) {
+        gameBoardDOMElement.classList.remove('display-cross-on-hover');
+      }
+    }
+  }
+
+  // following to be called by game object after a valid move
+  function gameSettleGameBoardElement(i, j, marker) {
+    const gameBoardDOMElement = gameGetGameBoardElementByIndices(i, j);
+    gameBoardDOMElement.classList.remove('unsettled');
+    gameBoardDOMElement.classList.add('settled');
+    //remove game.playRound() listener
+    gameBoardDOMElement.removeEventListener('click', dummyFunction);
+
+    if (marker = 'cross') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/cross.svg'}));
+    else if (marker = 'nought') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/nought.svg'}));
+  }
+
+  
+  // following will be called if game ends due to someone winning. If there is a tie it won't be called
+  function gameChangeToFinishedBoard() {
+    gameRemoveHoverBackgrounds();
+    const gameBoardDOMElements = document.querySelectorAll('.game-board-element');
+    for (let i = 0; i < gameBoardDOMElements.length; i++) {
+      const gameBoardDOMElement = gameBoardDOMElements.item(i);
+      gameSettleGameBoardElement(gameBoardDOMElement.getAttribute('data-i'), gameBoardDOMElement.getAttribute('data-j'));
+    }
+  }
+
+  function gameIncrementTotal(identifierName) {
+    const total = document.querySelector(`.${identifierName} .total-value`);
+    let newTotalValue = ++Number(total.textContent);
+    total.textContent = newTotalValue;
+  }
+
+  function gameDisplayChoiceDiv() {
+    document.querySelector('.choices').removeAttribute('style');
+  }
+
+  function gameHideChoiceDiv() {
+    document.querySelector('.choices').setAttribute('style', 'visibility: hidden;');
+  }
+
+  function gameResetGameBoard(startingMarker) {
+    const gameBoardDOMElement = document.getElementById('game-board-container');
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        const gameBoardDOMElement = gameGetGameBoardElementByIndices(i, j);
+        while (gameBoardDOMElement.hasChildNodes()) {
+          gameBoardDOMElement.removeChild(gameBoardDOMElement.firstChild);
+        }
+        gameBoardDOMElement.classList.remove('settled');
+        gameBoardDOMElement.classList.add('unsettled');
+        // add game.playRound listener 
+        gameBoardDOMElement.addEventListener('click', dummyFunction);
+      }
+    }
+    if (startingMarker === 'cross') gameAddCrossHoverBackgrounds();
+    else gameAddNoughtHoverBackgrounds();
+  }
+
+
   function displayResultsScreen(player1Name, player2Name, numPlayer1Wins, numTies, numPlayer2Wins) {
     clearDisplay();
     const mainContainer = getMainContainer();
@@ -227,8 +334,20 @@ const displayController = (() => {
     const tieTotal = createTotalDiv|('Tie', undefined, numTies);
     const player2Total = createTotalDiv(player2Name, undefined, numPlayer2Wins);
     finalTotalsContainer.append(player1Total, tieTotal, player2Total);
+
+    textBox.append(finalTotalsContainer);
+
+    const choiceDiv = createChoiceDiv({'go back to main menu': displayStartFrame});
+
+    mainContainer.append(textBox, choiceDiv);
   }
 
   return {displayStartFrame, displayNameSelectionFrame, displayDifficultySelectionFrame, displayGame, displayResultsScreen};
 
 })();
+
+const game = (playerX, playerO) => {
+
+  
+
+};
