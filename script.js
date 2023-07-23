@@ -3,6 +3,7 @@
 const gameBoard = (() => {
 
   const board = [['', '', ''], ['', '', ''], ['', '', '']];
+  let squaresOccupied = 0;
 
   function validateIndices(i, j) {
     if (!Number.isInteger(i) || !Number.isInteger(j)) throw new TypeError(`Arguments must be integers of type number`);
@@ -22,18 +23,31 @@ const gameBoard = (() => {
   function setNought(i, j) {
     validateIsPossibleMove(i, j);
     board[i][j] = 'o';
+    squaresOccupied++;
     return this;
   }
   
   function setCross(i, j) {
     validateIsPossibleMove(i, j);
     board[i][j] = 'x';
+    squaresOccupied++;
+    return this;
+  }
+
+  function setMarker(marker, i, j) {
+    if (marker === 'x') setCross(i, j);
+    else if (marker === 'o') setNought(i, j);
+    else throw new Error(`invalid marker: ${marker}`);
     return this;
   }
 
   function getValueAt(i, j) {
     validateIndices(i, j);
     return board[i][j];
+  }
+  
+  function getNumSquaresOccupied() {
+    return squaresOccupied;
   }
 
   function clearBoard() {
@@ -42,10 +56,11 @@ const gameBoard = (() => {
         board[i][j] = '';
       }
     }
+    squaresOccupied = 0;
     return this;
   }
 
-  return {isEmpty, setNought, setCross, getValueAt, clearBoard};
+  return {isEmpty, setNought, setCross, setMarker, getValueAt, getNumSquaresOccupied, clearBoard};
 
 })();
 
@@ -153,7 +168,12 @@ const displayController = (() => {
     nameInputContainer.append(crossNameInput, noughtNameInput);
     textBox.append(nameInputContainer);
 
-    const choiceDiv = createChoiceDiv({'go back': displayStartFrame, 'play': dummyFunction});
+    const choiceDiv = createChoiceDiv(
+    {
+      'go back': displayStartFrame, 
+      'play': game.startGame(playerFactory(crossNameInput.querySelector('input').value, 'x', 'human'), playerFactory(noughtNameInput.querySelector('input').value, 'o', 'human'))
+    }
+    );
 
     mainContainer.append(textBox, choiceDiv);
   }
@@ -162,13 +182,15 @@ const displayController = (() => {
     clearDisplay();
     const mainContainer = getMainContainer();
     const textBox = createTextBox([['h2', 'Select AI Difficulty']]);
-    const choiceDiv = createChoiceDiv({'easy': dummyFunction, 'medium': dummyFunction, 'impossible': dummyFunction});
+    const choiceDiv = createChoiceDiv(
+    {
+      'easy': game.startGame(playerFactory('Human - You', 'x', 'human'), playerFactory('AI - Easy', 'o', 'aiEasy')), 
+      'medium': game.startGame(playerFactory('Human - You', 'x', 'human'), playerFactory('AI - Medium', 'o', 'aiMedium')), 
+      'impossible': game.startGame(playerFactory('Human - You', 'x', 'human'), playerFactory('AI - Impossible', 'o', 'aiImpossible'))
+    }
+    );
     const goBackDiv = createChoiceDiv({'go back': displayStartFrame});
     mainContainer.append(textBox, choiceDiv, goBackDiv);
-  }
-
-  function dummyFunction() {
-
   }
 
   function createTotalDiv(identifierName, identifierSymbolSource, totalValueNumber) {
@@ -213,13 +235,13 @@ const displayController = (() => {
         gameBoardDOMElement.classList.add('unsettled');
         
         // can call game.playRound()
-        gameBoardDOMElement.addEventListener('click', dummyFunction);
+        gameBoardDOMElement.addEventListener('click', game.playRound);
 
         gameBoardDOMContainer.append(gameBoardDOMElement);
       }
     }
 
-    const choiceDiv = createChoiceDiv({'finish': displayResultsScreen, 'play again': dummyFunction});
+    const choiceDiv = createChoiceDiv({'finish': displayResultsScreen, 'play again': game.startNextGame});
     choiceDiv.setAttribute('style', 'visibility: hidden;');
 
     mainContainer.append(resultTotalsContainer, gameBoardDOMContainer, choiceDiv);
@@ -253,7 +275,8 @@ const displayController = (() => {
     for (let i = 0; i < gameBoardDOMElements.length; i++) {
       const gameBoardDOMElement = gameBoardDOMElements.item(i);
       if (gameBoardDOMElement.classList.contains('unsettled')) {
-        gameBoardDOMElement.classList.remove('display-nought-on-hover');
+        gameBoardDOMElement.classList.remove('display-cross-on-hover');
+        gameBoardDOMElement.classList.add('display-nought-on-hover');
       }
     }
   }
@@ -263,7 +286,8 @@ const displayController = (() => {
     for (let i = 0; i < gameBoardDOMElements.length; i++) {
       const gameBoardDOMElement = gameBoardDOMElements.item(i);
       if (gameBoardDOMElement.classList.contains('unsettled')) {
-        gameBoardDOMElement.classList.remove('display-cross-on-hover');
+        gameBoardDOMElement.classList.remove('display-nought-on-hover');
+        gameBoardDOMElement.classList.add('display-cross-on-hover');
       }
     }
   }
@@ -272,12 +296,14 @@ const displayController = (() => {
   function gameSettleGameBoardElement(i, j, marker) {
     const gameBoardDOMElement = gameGetGameBoardElementByIndices(i, j);
     gameBoardDOMElement.classList.remove('unsettled');
+    gameBoardDOMElement.classList.remove('display-cross-on-hover');
+    gameBoardDOMElement.classList.remove('display-nought-on-hover');
     gameBoardDOMElement.classList.add('settled');
     //remove game.playRound() listener
-    gameBoardDOMElement.removeEventListener('click', dummyFunction);
+    gameBoardDOMElement.removeEventListener('click', game.playRound);
 
-    if (marker = 'cross') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/cross.svg'}));
-    else if (marker = 'nought') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/nought.svg'}));
+    if (marker === 'x') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/cross.svg'}));
+    else if (marker === 'o') gameBoardDOMElement.appendChild(createElement('img', {'src': './img/icons/nought.svg'}));
   }
 
   
@@ -306,7 +332,6 @@ const displayController = (() => {
   }
 
   function gameResetGameBoard(startingMarker) {
-    const gameBoardDOMElement = document.getElementById('game-board-container');
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
         const gameBoardDOMElement = gameGetGameBoardElementByIndices(i, j);
@@ -316,10 +341,10 @@ const displayController = (() => {
         gameBoardDOMElement.classList.remove('settled');
         gameBoardDOMElement.classList.add('unsettled');
         // add game.playRound listener 
-        gameBoardDOMElement.addEventListener('click', dummyFunction);
+        gameBoardDOMElement.addEventListener('click', game.playRound);
       }
     }
-    if (startingMarker === 'cross') gameAddCrossHoverBackgrounds();
+    if (startingMarker === 'x') gameAddCrossHoverBackgrounds();
     else gameAddNoughtHoverBackgrounds();
   }
 
@@ -342,12 +367,184 @@ const displayController = (() => {
     mainContainer.append(textBox, choiceDiv);
   }
 
-  return {displayStartFrame, displayNameSelectionFrame, displayDifficultySelectionFrame, displayGame, displayResultsScreen};
+  return {displayStartFrame, 
+    displayNameSelectionFrame, 
+    displayDifficultySelectionFrame, 
+    displayGame,
+    gameSettleGameBoardElement,
+    gameChangeToFinishedBoard,
+    gameStyleWinningLine,
+    gameIncrementTotal,
+    gameDisplayChoiceDiv,
+    gameHideChoiceDiv,
+    gameResetGameBoard,
+    displayResultsScreen};
 
 })();
 
-const game = (playerX, playerO) => {
+const game = (() => {
 
-  
+  let numPlayerXWins = 0;
+  let numTies = 0;
+  let numPlayerOWins = 0;
+  let playerX = undefined;
+  let playerO = undefined;
+  let playingFirst = undefined;
+  let activePlayer = undefined;
 
-};
+  function resetAll() {
+    numPlayerXWins = 0;
+    numTies = 0;
+    numPlayerOWins = 0;
+    playerX = undefined;
+    playerO = undefined;
+    playingFirst = undefined;
+    activePlayer = undefined;
+  }
+
+  function validateMarker(marker) {
+    if (marker !== 'x' && marker !== 'o') throw new Error(`Illegal marker: ${marker}`);
+  }
+
+  function validateIndex(x) {
+    if (!Number.isInteger(x)) throw new TypeError(`Argument must be an integer of type number`);
+    else if (x < 0 || x > 2) throw new Error('Argument must be between 0 and 2 inclusive');
+  }
+
+  function validateIndices(i, j) {
+    if (!Number.isInteger(i) || !Number.isInteger(j)) throw new TypeError(`Arguments must be integers of type number`);
+    else if (i < 0 || i > 2 || j < 0 || j > 2) throw new Error('Arguments must be between 0 and 2 inclusive');
+  }
+
+  function isWinningRow(marker, i) {
+    validateMarker(marker);
+    validateIndex(i);
+    for (let j = 0; j < 3; j++) {
+      if (gameBoard.getValueAt(i, j) !== marker) {
+        return false;
+      }
+    }
+    return [[i, 0], [i, 1], [i, 2]];
+  }
+
+  function isWinningColumn(marker, j) {
+    validateMarker(marker);
+    validateIndex(j);
+    for (let i = 0; i < 3; i++) {
+      if (gameBoard.getValueAt(i, j) !== marker) {
+        return false;
+      }
+    }
+    return [[0, j], [1, j], [2, j]];
+  }
+
+  function isWinningDiagonal(marker, i, j) {
+    validateMarker(marker);
+    validateIndices(i, j);
+    if (i === 1 && j === 1) {
+
+      if (gameBoard.getValueAt(0, 0) === marker && gameBoard.getValueAt(2, 2) === marker) {
+        return [[0, 0], [1, 1], [2, 2]];
+      } else if (gameBoard.getValueAt(0, 2) === marker && gameBoard.getValueAt(2, 0) === marker) {
+        return [[0, 2], [1, 1], [2, 0]];
+      }
+      else return false;
+
+    } else if (i === j) {
+      for (let x = 0; x < 3; x++) {
+        if (gameBoard.getValueAt(x, x) !== marker) {
+          return false;
+        }
+      }
+      return [[0, 0], [1, 1], [2, 2]];
+
+    } else if ((i === 0 && j === 2) || (i === 2 && j === 0)) {
+      for (let x = 0; x < 3; x++) {
+        if (gameBoard.getValueAt(x, 2-x) !== marker) {
+          return false;
+        }
+      }
+      return [[0, 2], [1, 1], [2, 0]];
+    } 
+    
+    return false;
+  }
+
+  function isWinningMove(marker, i, j) {
+    return !!isWinningRow(marker, i, j) || !!isWinningColumn(marker, i, j) || !!isWinningDiagonal(marker, i, j);
+  }
+
+  function returnWinningLine(marker, i, j) {
+    if (isWinningRow(marker, i, j)) return isWinningRow(marker, i, j);
+    else if (isWinningColumn(marker, i, j)) return isWinningColumn(marker, i, j);
+    else if (isWinningDiagonal(marker, i, j)) return isWinningDiagonal(marker, i, j);
+    else throw new Error('Not possible to return winning line if there are no winning lines');
+  }
+
+  function incrementResultTotal(winningPlayer = null) {
+    if (winningPlayer === playerX) numPlayerXWins++;
+    else if (winningPlayer === playerO) numPlayerOWins++;
+    else if (winningPlayer === null) numTies++;
+    else throw new Error(`invalid argument: ${winningPlayer}`);
+  }
+
+  function returnNonActivePlayer() {
+    if (activePlayer === playerX) return playerO;
+    else return playerX;
+  }
+
+  function returnPlayingSecondPlayer() {
+    if (playingFirst === playerX) return playerO;
+    else return playerX;
+  }
+
+  // this function should only be called on empty squares
+  function playRound() {
+    const i = this.getAttribute('data-i');
+    const j = this.getAttribute('data-j');
+    if (!gameBoard.isEmpty(i, j)) throw new Error("playRound can't be called on occupied square");
+    const activeMarker = activePlayer.getMarker();
+    gameBoard.setMarker(activeMarker, i, j);
+    if (isWinningMove(activeMarker, i, j)) {
+      displayController.gameChangeToFinishedBoard();
+      displayController.gameStyleWinningLine(returnWinningLine(activeMarker, i, j));
+      incrementResultTotal(activePlayer);
+      displayController.gameIncrementTotal(activePlayer.getName());
+      displayController.gameDisplayChoiceDiv();
+    } else {
+      displayController.gameSettleGameBoardElement(i, j, activeMarker);
+      if (gameBoard.getNumSquaresOccupied() !== 9) {
+        activePlayer = returnNonActivePlayer();
+      } else {
+        incrementResultTotal();
+        displayController.gameIncrementTotal('Tie');
+        displayController.gameDisplayChoiceDiv();
+      }
+    }
+  }
+
+  function startGame(playerXArg, playerOArg) {
+    playerX = playerXArg;
+    playerO = playerOArg;
+    playingFirst = playerX;
+    activePlayer = playerX;
+    displayController.displayGame(playerX.getName(). playerO.getName(), playerX.getMarker());
+  }
+
+  function startNextGame() {
+    displayController.gameResetGameBoard(playingFirst.getMarker());
+    gameBoard.clearBoard();
+    playingFirst = returnPlayingSecondPlayer();
+    activePlayer = playingFirst;
+    displayController.gameHideChoiceDiv();
+  }
+
+  function exitGame() {
+    displayController.displayResultsScreen(playerX.getName(), playerO.getName(), numPlayerXWins, numTies, numPlayerOWins);
+    resetAll();
+  }
+
+  return {playRound, startGame, startNextGame, exitGame};
+
+})();
+
